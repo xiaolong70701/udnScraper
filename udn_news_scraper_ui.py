@@ -3,36 +3,71 @@ from datetime import date
 import pandas as pd
 import asyncio
 import nest_asyncio
-from UDNNewsScraper import UDNNewsScraper
-import base64
+import sys
+import subprocess
+import os
+
+# 確保 Playwright 瀏覽器已安裝
+def setup_playwright():
+    # 檢查 Playwright 瀏覽器是否已安裝
+    browser_path = os.path.expanduser("~/.cache/ms-playwright/chromium_headless_shell-*")
+    import glob
+    browser_paths = glob.glob(browser_path)
+    
+    if not browser_paths:
+        # 顯示安裝訊息
+        with st.spinner("正在安裝 Playwright 瀏覽器，這可能需要幾分鐘時間..."):
+            try:
+                # 執行安裝命令
+                subprocess.run(
+                    ["playwright", "install", "chromium"],
+                    check=True,
+                    capture_output=True
+                )
+                st.success("Playwright 瀏覽器安裝成功！")
+                # 重新載入頁面以確保所有功能正常
+                st.experimental_rerun()
+            except subprocess.CalledProcessError as e:
+                st.error(f"Playwright 瀏覽器安裝失敗: {e.stderr.decode()}")
+                st.stop()
+            except Exception as e:
+                st.error(f"安裝過程中發生錯誤: {str(e)}")
+                st.stop()
 
 # 啟用嵌套事件循環支持，讓 asyncio 可以在 Streamlit 中工作
 nest_asyncio.apply()
 
-# 創建下載連結的函數，不使用 st.download_button
+# 檢查並設置 Playwright
+setup_playwright()
+
+# 延遲導入 UDNNewsScraper，確保 Playwright 已設置
+from UDNNewsScraper import UDNNewsScraper
+import base64
+
+# 創建下載連結的函數，使用簡單的 HTML 連結而非自定義樣式
 def get_csv_download_link(df, filename="data.csv"):
-    """生成 CSV 下載連結"""
+    """生成 CSV 下載連結，使用默認樣式"""
     csv = df.to_csv(index=False, encoding='utf-8-sig')
     csv_bytes = csv.encode('utf-8-sig')
     b64 = base64.b64encode(csv_bytes).decode()
-    href = f'<a href="data:file/csv;base64,{b64}" download="{filename}" class="download-link">下載爬取資料</a>'
+    href = f'<a href="data:file/csv;base64,{b64}" download="{filename}">下載爬取資料</a>'
     return href
 
 def main():
     st.title("UDN News Scraper")
 
     # 設置爬取參數
-    keyword = st.text_input("請輸入關鍵字", "臺灣")
+    keyword = st.text_input("請輸入關鍵字", "川普")
     
     # 日期選擇
     start_date = st.date_input("請選擇起始日期", value=date(2025, 1, 1))
-    end_date = st.date_input("請選擇結束日期", value=date(2025, 3, 11))
+    end_date = st.date_input("請選擇結束日期", value=date(2025, 1, 2))
     
     # 高級選項（可摺疊）
-    with st.expander("進階設定"):
-        headless = st.checkbox("不顯示瀏覽器", value=True)
+    with st.expander("高級選項"):
+        headless = st.checkbox("無頭模式 (不顯示瀏覽器)", value=True)
         manual_mode = st.checkbox("手動登入模式", value=False)
-        max_articles = st.number_input("最大爬取文章數", min_value=1, max_value=200, value=1)
+        max_articles = st.number_input("最大爬取文章數", min_value=1, max_value=200, value=10)
     
     # 開始爬取的按鈕
     if st.button("開始爬取"):
@@ -120,9 +155,6 @@ def main():
                 if not df.empty:
                     st.success(f"爬取成功！共獲取 {len(df)} 篇文章")
                     
-                    # 創建區域分割，上面顯示預覽，下面顯示其他功能
-                    col1, col2 = st.columns([3, 1])
-
                     # 顯示數據預覽
                     st.subheader("數據預覽")
                     st.dataframe(df.head(10))
@@ -133,37 +165,11 @@ def main():
                         if show_all:
                             st.dataframe(df)
 
-                    # 使用 HTML 下載連結代替 st.download_button
+                    # 提供下載連結，使用預設樣式
                     st.markdown(
                         get_csv_download_link(df, f"udn_{keyword}_新聞資料.csv"),
                         unsafe_allow_html=True
                     )
-                    
-                    # 添加一些 CSS 讓下載連結看起來像按鈕
-                    st.markdown("""
-                    <style>
-                    .download-link {
-                        background-color: transparent;
-                        border: 1px solid #d6d6d8;
-                        color: black !important;
-                        padding: 10px 10px;
-                        text-align: center;
-                        text-decoration: none;
-                        display: inline-block;
-                        font-size: 16px;
-                        margin: 2px 2px;
-                        cursor: pointer;
-                        border-radius: 12px;
-                        text-decoration: none !important;
-                        transition: all 0.15s ease;
-                    }
-                                
-                    .download-link:hover {
-                        border: 1px solid #ff4b4b;
-                        color: #ff4b4b !important;
-                    }
-                    </style>
-                    """, unsafe_allow_html=True)
                     
                     # 顯示一些統計信息
                     st.subheader("統計信息")
