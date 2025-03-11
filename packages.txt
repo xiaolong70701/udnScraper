@@ -1,4 +1,4 @@
-chromium-browser
+chromium
 libglib2.0-0
 libnss3
 libxcb1
@@ -15,4 +15,3 @@ libdrm2
 libgbm1
 fonts-liberation
 fonts-noto-color-emoji
-ttf-ubuntu-font-family

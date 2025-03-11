@@ -7,41 +7,52 @@ import sys
 import subprocess
 import os
 
-# 確保 Playwright 瀏覽器已安裝
-def setup_playwright():
-    # 檢查 Playwright 瀏覽器是否已安裝
-    browser_path = os.path.expanduser("~/.cache/ms-playwright/chromium_headless_shell-*")
-    import glob
-    browser_paths = glob.glob(browser_path)
-    
-    if not browser_paths:
-        # 顯示安裝訊息
-        with st.spinner("正在安裝 Playwright 瀏覽器，這可能需要幾分鐘時間..."):
-            try:
-                # 執行安裝命令
-                subprocess.run(
-                    ["playwright", "install", "chromium"],
-                    check=True,
-                    capture_output=True
-                )
-                st.success("Playwright 瀏覽器安裝成功！")
-                # 重新載入頁面以確保所有功能正常
-                st.experimental_rerun()
-            except subprocess.CalledProcessError as e:
-                st.error(f"Playwright 瀏覽器安裝失敗: {e.stderr.decode()}")
-                st.stop()
-            except Exception as e:
-                st.error(f"安裝過程中發生錯誤: {str(e)}")
-                st.stop()
-
 # 啟用嵌套事件循環支持，讓 asyncio 可以在 Streamlit 中工作
 nest_asyncio.apply()
 
-# 檢查並設置 Playwright
-setup_playwright()
+# 檢查並安裝 Playwright 瀏覽器
+def install_playwright_browser():
+    try:
+        with st.spinner("正在設置 Playwright 瀏覽器，請稍候..."):
+            # 先檢查 Playwright 是否已安裝瀏覽器
+            browser_exists = False
+            try:
+                # 這段程式碼會檢查瀏覽器是否已安裝
+                result = subprocess.run(
+                    ["playwright", "install", "chromium", "--help"], 
+                    capture_output=True,
+                    text=True
+                )
+                browser_exists = "already installed" in result.stdout or "已經安裝" in result.stdout
+            except:
+                pass
+            
+            if not browser_exists:
+                st.info("正在安裝 Playwright 瀏覽器，這可能需要幾分鐘時間...")
+                result = subprocess.run(
+                    ["playwright", "install", "chromium"],
+                    capture_output=True,
+                    text=True
+                )
+                if result.returncode != 0:
+                    st.error(f"Playwright 瀏覽器安裝失敗: {result.stderr}")
+                    st.info("將嘗試使用內置的 Chromium")
+                else:
+                    st.success("Playwright 瀏覽器安裝成功！")
+    except Exception as e:
+        st.warning(f"無法安裝 Playwright 瀏覽器: {str(e)}")
+        st.info("將嘗試使用內置的 Chromium")
 
-# 延遲導入 UDNNewsScraper，確保 Playwright 已設置
-from UDNNewsScraper import UDNNewsScraper
+# 運行安裝
+install_playwright_browser()
+
+# 導入 UDNNewsScraper
+try:
+    from UDNNewsScraper import UDNNewsScraper
+except ImportError as e:
+    st.error(f"無法導入 UDNNewsScraper: {str(e)}")
+    st.stop()
+
 import base64
 
 # 創建下載連結的函數，使用簡單的 HTML 連結而非自定義樣式
@@ -188,6 +199,7 @@ def main():
                 article_status.empty()
                 
                 st.error(f"爬取過程中發生錯誤: {str(e)}")
+                st.info("如果是瀏覽器相關錯誤，請嘗試重新啟動應用或使用 '手動登入模式'")
 
 if __name__ == "__main__":
     main()
